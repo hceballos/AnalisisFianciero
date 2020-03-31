@@ -108,8 +108,3 @@ class Spreadsheet():
         datos.to_excel(writer, sheet_name='Sql')
         writer.save()
         """
-
-        # 10673579-4
-        # 3167
-        #https://stackabuse.com/converting-strings-to-datetime-in-python/
-        #https://es.pornhubpremium.com/view_video.php?viewkey=ph5e14678dede01
