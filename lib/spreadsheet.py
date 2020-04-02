@@ -1,13 +1,10 @@
+# -*- coding: utf-8 -*-
 import pandas as pd
 import numpy as np
 import glob
-from xls2db import xls2db
-from os import path
-from os import remove
 import sqlite3
-import re
-import datetime
-import time
+from sqlalchemy import create_engine
+
 
 class Spreadsheet():
 
@@ -17,94 +14,58 @@ class Spreadsheet():
         self.read_Excel()
 
     def read_Excel(self):
-        if path.exists("devengo.db"):
-            remove('devengo.db')
-            remove('output.xlsx')
-
-        all_data = pd.DataFrame()
+        devengo = pd.DataFrame()
         for f in glob.glob(self.excel_path_Devengo):
             df = pd.read_excel(f)
             print("Analizando  : ", f)
-            all_data = all_data.append(df,ignore_index=True)
+            devengo = devengo.append(df,ignore_index=True)
 
-        all_data_Contable = pd.DataFrame()
+        contable = pd.DataFrame()
         for f in glob.glob(self.excel_path_Contable):
             df = pd.read_excel(f)
             print("Analizando  : ", f)
-            all_data_Contable = all_data_Contable.append(df,ignore_index=True)
-
-        all_data['Tipo Vista']          = all_data.drop( all_data[ all_data['Tipo Vista'] == 'Saldo Inicial' ].index , inplace=True )
-        all_data['Monto Documento.1']   = [w.replace('(', '-') for w in all_data['Monto Documento.1']]
-        all_data['Monto Documento.1']   = [w.replace(')', '' ) for w in all_data['Monto Documento.1']]
-        all_data['Monto Documento.1']   = [w.replace('.', '' ) for w in all_data['Monto Documento.1']]
-        all_data['Monto Documento.1']   = pd.to_numeric(all_data['Monto Documento.1'])
-        all_data['Monto Documento']     = [w.replace('.', '' ) for w in all_data['Monto Documento']]
-        all_data['Monto Documento']     = pd.to_numeric(all_data['Monto Documento'])
-        all_data["N Concepto"]          = all_data["Concepto"].str.split(" ", n = 1, expand = True)[0]
-        all_data["Concepto Nombre"]     = all_data["Concepto"].str.split(" ", n = 1, expand = True)[1]
-        all_data["Rut"]                 = all_data["Principal"].str.split(" ", n = 1, expand = True)[0]
-        all_data["Rut Nombre"]          = all_data["Principal"].str.split(" ", n = 1, expand = True)[1]
-
-        print( all_data["Fecha Generación"] )
-
-        # ----------------------------------------------
-
-        all_data_Contable['Tipo Vista']             = all_data_Contable.drop( all_data_Contable[ all_data_Contable['Tipo Vista'] == 'Saldo Inicial' ].index , inplace=True )
-        all_data_Contable['Saldo']                  = [w.replace('(', '-') for w in all_data_Contable['Saldo']]
-        all_data_Contable['Saldo']                  = [w.replace(')', '' ) for w in all_data_Contable['Saldo']]
-        all_data_Contable['Saldo']                  = [w.replace('.', '' ) for w in all_data_Contable['Saldo']]
-        all_data_Contable['Saldo']                  = pd.to_numeric(all_data_Contable['Saldo'])
-        all_data_Contable['Debe']                   = [w.replace('(', '-') for w in all_data_Contable['Debe']]
-        all_data_Contable['Debe']                   = [w.replace(')', '' ) for w in all_data_Contable['Debe']]
-        all_data_Contable['Debe']                   = [w.replace('.', '' ) for w in all_data_Contable['Debe']]
-        all_data_Contable['Debe']                   = pd.to_numeric(all_data_Contable['Debe'])
-        all_data_Contable['Haber']                  = [w.replace('(', '-') for w in all_data_Contable['Haber']]
-        all_data_Contable['Haber']                  = [w.replace(')', '' ) for w in all_data_Contable['Haber']]
-        all_data_Contable['Haber']                  = [w.replace('.', '' ) for w in all_data_Contable['Haber']]
-        all_data_Contable['Haber']                  = pd.to_numeric(all_data_Contable['Haber'])
-        all_data_Contable['Saldo Acumulado']        = [w.replace('(', '-') for w in all_data_Contable['Saldo Acumulado']]
-        all_data_Contable['Saldo Acumulado']        = [w.replace(')', '' ) for w in all_data_Contable['Saldo Acumulado']]
-        all_data_Contable['Saldo Acumulado']        = [w.replace('.', '' ) for w in all_data_Contable['Saldo Acumulado']]
-        all_data_Contable['Saldo Acumulado']        = pd.to_numeric(all_data_Contable['Saldo Acumulado'])
-        all_data_Contable["N Cuenta Contable"]      = all_data_Contable["Cuenta Contable"].str.split(" ", n = 1, expand = True)[0]
-        all_data_Contable["Cuenta Contable Nombre"] = all_data_Contable["Cuenta Contable"].str.split(" ", n = 1, expand = True)[1]
-        all_data_Contable["Rut"]                    = all_data_Contable["Principal"].str.split(" ", n = 1, expand = True)[0]
-        all_data_Contable["Rut Nombre"]             = all_data_Contable["Principal"].str.split(" ", n = 1, expand = True)[1]
-        # ----------------------------------------------
-        print("Creando Excel    ")
-        writer = pd.ExcelWriter('output.xlsx', engine='xlsxwriter')
-        print("Creando pestaña Devengo    ")
-        all_data.to_excel(writer, sheet_name='Devengo')
-        print("Creando pestaña Contable    ")
-        all_data_Contable.to_excel(writer, sheet_name='Contable')
-        writer.save()
-
-        print("Creando Base de Datos    ")
-        xls2db("output.xlsx", "devengo.db")
+            contable = contable.append(df,ignore_index=True)
 
 
-        """
-        cnx = sqlite3.connect('devengo.db')
-        consulta ="\
-            SELECT \
-                Contable.'Cuenta Contable', \
-                Devengo.Concepto, \
-                Devengo.Principal, \
-                Contable.'Número Documento' , \
-                Contable.'Debe', \
-                Contable.'Haber'  \
-            FROM \
-                Contable INNER JOIN Devengo \
-                ON Contable.Rut = Devengo.Rut \
-                AND Contable.'Número Documento' = Devengo.'Número Documento'  \
-            WHERE \
-                Contable.Rut like '%' \
-                and Contable.'Número Documento' like '%' \
-        "
+        devengo['Tipo Vista']          = devengo.drop( devengo[ devengo['Tipo Vista'] == 'Saldo Inicial' ].index , inplace=True )
+        devengo['Monto Documento.1']   = [w.replace('(', '-') for w in devengo['Monto Documento.1']]
+        devengo['Monto Documento.1']   = [w.replace(')', '' ) for w in devengo['Monto Documento.1']]
+        devengo['Monto Documento.1']   = [w.replace('.', '' ) for w in devengo['Monto Documento.1']]
+        devengo['Monto Documento.1']   = pd.to_numeric(devengo['Monto Documento.1'])
+        devengo['Monto Documento']     = [w.replace('.', '' ) for w in devengo['Monto Documento']]
+        devengo['Monto Documento']     = pd.to_numeric(devengo['Monto Documento'])
+        devengo["N Concepto"]          = devengo["Concepto"].str.split(" ", n = 1, expand = True)[0]
+        devengo["Concepto Nombre"]     = devengo["Concepto"].str.split(" ", n = 1, expand = True)[1]
+        devengo["Rut"]                 = devengo["Principal"].str.split(" ", n = 1, expand = True)[0]
+        devengo["Rut Nombre"]          = devengo["Principal"].str.split(" ", n = 1, expand = True)[1]
+        devengo["Fecha Generación"]    = pd.to_datetime(devengo["Fecha Generación"]).dt.date
+        devengo["Folio"]               = devengo["Folio"].astype(str)
+        devengo["Número Documento"]    = devengo["Número Documento"].astype(str)
 
-        datos = pd.read_sql_query(consulta, cnx)
 
-        writer = pd.ExcelWriter('output_1.xlsx', engine='xlsxwriter')
-        datos.to_excel(writer, sheet_name='Sql')
-        writer.save()
-        """
+        contable['Tipo Vista']             = contable.drop( contable[ contable['Tipo Vista'] == 'Saldo Inicial' ].index , inplace=True )
+        contable['Saldo']                  = [w.replace('(', '-') for w in contable['Saldo']]
+        contable['Saldo']                  = [w.replace(')', '' ) for w in contable['Saldo']]
+        contable['Saldo']                  = [w.replace('.', '' ) for w in contable['Saldo']]
+        contable['Saldo']                  = pd.to_numeric(contable['Saldo'])
+        contable['Debe']                   = [w.replace('(', '-') for w in contable['Debe']]
+        contable['Debe']                   = [w.replace(')', '' ) for w in contable['Debe']]
+        contable['Debe']                   = [w.replace('.', '' ) for w in contable['Debe']]
+        contable['Debe']                   = pd.to_numeric(contable['Debe'])
+        contable['Haber']                  = [w.replace('(', '-') for w in contable['Haber']]
+        contable['Haber']                  = [w.replace(')', '' ) for w in contable['Haber']]
+        contable['Haber']                  = [w.replace('.', '' ) for w in contable['Haber']]
+        contable['Haber']                  = pd.to_numeric(contable['Haber'])
+        contable['Saldo Acumulado']        = [w.replace('(', '-') for w in contable['Saldo Acumulado']]
+        contable['Saldo Acumulado']        = [w.replace(')', '' ) for w in contable['Saldo Acumulado']]
+        contable['Saldo Acumulado']        = [w.replace('.', '' ) for w in contable['Saldo Acumulado']]
+        contable['Saldo Acumulado']        = pd.to_numeric(contable['Saldo Acumulado'])
+        contable["N Cuenta Contable"]      = contable["Cuenta Contable"].str.split(" ", n = 1, expand = True)[0]
+        contable["Cuenta Contable Nombre"] = contable["Cuenta Contable"].str.split(" ", n = 1, expand = True)[1]
+        contable["Rut"]                    = contable["Principal"].str.split(" ", n = 1, expand = True)[0]
+        contable["Rut Nombre"]             = contable["Principal"].str.split(" ", n = 1, expand = True)[1]
+        contable["Fecha"]                  = pd.to_datetime(contable["Fecha"]).dt.date
+
+        engine = create_engine('sqlite:///save_pandas.db', echo = True)
+        devengo.to_sql("devengo", con=engine)
+        contable.to_sql("contable", con=engine)
